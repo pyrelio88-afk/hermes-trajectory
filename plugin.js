@@ -45,64 +45,28 @@ const $viewKey = atom('')
 const $selected = atom(null)
 
 const $mode = atom('table')
-const $theme = atom('china')
 const $diy = atom(null)
-const $paint = atom(false)
 
-const THEMES = {
-  china: {
-    user: '#4b5cc4',
-    context: '#789262',
-    thinking: '#801dae',
-    message: '#d6ecf0',
-    tool: '#ff8936',
-    subagent: '#30dff3',
-    approval: '#d9b611',
-    error: '#c3272b'
-  },
-  qinghua: {
-    user: '#177cb0',
-    context: '#065279',
-    thinking: '#3d3b4f',
-    message: '#e9f1f6',
-    tool: '#4b5cc4',
-    subagent: '#30dff3',
-    approval: '#d6ecf0',
-    error: '#c3272b'
-  },
-  zhumo: {
-    user: '#3d3b4f',
-    context: '#574266',
-    thinking: '#801dae',
-    message: '#e9f1f6',
-    tool: '#ff4e20',
-    subagent: '#ff8936',
-    approval: '#ffc773',
-    error: '#c3272b'
-  },
-  bright: {
-    user: '#3b82f6',
-    context: '#22c55e',
-    thinking: '#7c3aed',
-    message: '#e4e4e7',
-    tool: '#f97316',
-    subagent: '#06b6d4',
-    approval: '#ec4899',
-    error: '#ef4444'
-  }
+const DEFAULT = {
+  user: '#4b5cc4',
+  context: '#789262',
+  thinking: '#801dae',
+  message: '#d6ecf0',
+  tool: '#ff8936',
+  subagent: '#30dff3',
+  approval: '#d9b611',
+  error: '#c3272b'
 }
 
-const KIND_KEYS = ['user', 'context', 'thinking', 'message', 'tool', 'subagent', 'approval', 'error']
-
 const KIND = {
-  user: { lane: 0, color: THEMES.china.user },
-  context: { lane: 0, color: THEMES.china.context },
-  thinking: { lane: 1, color: THEMES.china.thinking },
-  message: { lane: 1, color: THEMES.china.message },
-  tool: { lane: 2, color: THEMES.china.tool },
-  subagent: { lane: 2, color: THEMES.china.subagent },
-  approval: { lane: 2, color: THEMES.china.approval },
-  error: { lane: 2, color: THEMES.china.error }
+  user: { lane: 0 },
+  context: { lane: 0 },
+  thinking: { lane: 1 },
+  message: { lane: 1 },
+  tool: { lane: 2 },
+  subagent: { lane: 2 },
+  approval: { lane: 2 },
+  error: { lane: 2 }
 }
 
 const KIND_ALIAS = {
@@ -399,10 +363,7 @@ function kindMeta(name) {
 }
 
 function liveColors() {
-  const id = $theme.get()
-  const base = THEMES[id] || THEMES.china
-  if (id === 'diy') return { ...THEMES.china, ...($diy.get() || {}) }
-  return base
+  return { ...DEFAULT, ...($diy.get() || {}) }
 }
 
 function colorOf(kind, error) {
@@ -542,17 +503,11 @@ function persist() {
         buckets: $buckets.get(),
         aliases: $aliases.get(),
         mode: $mode.get(),
-        theme: $theme.get(),
         diy: $diy.get()
       })
   } catch {
     /* ignore */
   }
-}
-
-function setTheme(id) {
-  $theme.set(id)
-  persist()
 }
 
 function setMode(id) {
@@ -562,9 +517,7 @@ function setMode(id) {
 }
 
 function setDiyColor(kind, hex) {
-  const next = { ...liveColors(), [kind]: hex }
-  $diy.set(next)
-  $theme.set('diy')
+  $diy.set({ ...liveColors(), [kind]: hex })
   persist()
 }
 
@@ -648,7 +601,6 @@ function useViewEvents() {
 }
 
 function Timeline({ t }) {
-  useValue($theme)
   useValue($diy)
   const events = useViewEvents()
   const selected = useValue($selected)
@@ -784,42 +736,7 @@ function Timeline({ t }) {
   })
 }
 
-function ThemeBar({ t }) {
-  const theme = useValue($theme)
-  useValue($diy)
-  const ids = ['china', 'qinghua', 'zhumo', 'bright', 'diy']
-  return jsx('div', {
-    style: {
-      display: 'flex',
-      flexWrap: 'wrap',
-      gap: 6,
-      padding: '8px 10px',
-      borderBottom: '1px solid var(--ui-stroke-secondary)'
-    },
-    children: ids.map((id) =>
-      jsx(
-        'button',
-        {
-          type: 'button',
-          onClick: () => setTheme(id),
-          style: {
-            border: '1px solid var(--ui-stroke-secondary)',
-            borderRadius: 6,
-            padding: '3px 8px',
-            fontSize: 11,
-            background: theme === id ? 'color-mix(in srgb, var(--ui-accent) 16%, transparent)' : 'transparent',
-            color: theme === id ? 'var(--ui-text-primary, var(--foreground))' : 'var(--ui-text-tertiary)'
-          },
-          children: tx(t, `theme.${id}`, id)
-        },
-        id
-      )
-    )
-  })
-}
-
 function Legend({ t }) {
-  useValue($theme)
   useValue($diy)
   return jsx('div', {
     style: {
@@ -883,7 +800,6 @@ function Legend({ t }) {
 
 function EventRow({ ev, now, t }) {
   const selected = useValue($selected)
-  useValue($theme)
   useValue($diy)
   const vk = visualKind(ev.kind)
   const dur = ev.running ? formatElapsed(now - ev.at) : ev.ms != null ? formatElapsed(ev.ms) : ''
@@ -1099,7 +1015,6 @@ function TrajectoryPane() {
   return jsxs('div', {
     className: 'flex h-full min-h-0 flex-col',
     children: [
-      jsx(ThemeBar, { t }),
       jsx(Legend, { t }),
       jsx(Timeline, { t }),
       jsxs('div', {
@@ -1205,7 +1120,6 @@ export default {
         $buckets.set(saved.buckets)
         if (saved.aliases) $aliases.set(saved.aliases)
         if (VIEWS.includes(saved.mode)) $mode.set(saved.mode)
-        if (saved.theme) $theme.set(saved.theme)
         if (saved.diy && typeof saved.diy === 'object') $diy.set(saved.diy)
       } else {
         $buckets.set(saved)
