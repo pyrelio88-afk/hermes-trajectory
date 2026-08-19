@@ -1,8 +1,23 @@
 # hermes-trajectory
 
-Hermes Desktop 右侧「轨迹」面板：对照 DeepSeek Harness 的三车道色轴（输入 / 模型 / 工具），按 **bot + 会话** 分桶，一轮结束不删历史。
+Hermes Desktop 右侧「轨迹」面板。对照 DeepSeek Harness 的三车道，不是输入框上的进度条。
 
-不是输入框上的进度胶囊。
+![轨迹面板](docs/pane.png)
+
+## 三列怎么读
+
+上面色轴、中间图例、下面步骤，都是同一套三列：
+
+| 提问区 | 模型区 | 工具区 |
+| --- | --- | --- |
+| 蓝 · 提问 | 紫 · 思考 | 橙 · 工具 |
+| 绿 · 上下文 | 玫红 · 回答 | 青 · 子任务 |
+|  |  | 黄绿 · 待确认 |
+|  |  | 红 · 出错 |
+
+![颜色图例](docs/legend.png)
+
+色轴可左右滑。一轮结束不删。换对话、换 bot 各看各的。
 
 ## 装到本机 Hermes
 
@@ -16,24 +31,11 @@ Hermes Desktop 右侧「轨迹」面板：对照 DeepSeek Harness 的三车道�
 
 ⌘K → **Reload desktop plugins**。设置 → 插件里打开 **Trajectory**。
 
-只进 default 电脑端；wechat-bot 不要拷这份。
-
-## 怎么读
-
-- 蓝：你
-- 绿：上下文
-- 靛：思考
-- 紫：回复
-- 橙：工具
-- 青：子代理
-- 黄：询问
-- 红：错误
-
-色轴可左右滑。换对话、换 bot 各看各的。
+只进 default 电脑端，不要拷到 wechat-bot。
 
 ## 语言
 
-跟 Hermes 一样：`en` / `zh` / `zh-hant` / `ja` / `ar`。`ctx.i18n.register` 嵌套 key，事件只存 key，切语言立刻变。
+跟 Hermes 一样：`en` / `zh` / `zh-hant` / `ja` / `ar`。事件只存 key，切语言立刻变。
 
 ## 规范
 

@@ -23,9 +23,17 @@ import { jsx, jsxs } from 'react/jsx-runtime'
 
 const ID = 'harness-progress'
 const MAX_EVENTS = 240
-const LANE_H = 14
-const SPAN_H = 8
-const SPAN_W = 14
+const LANE_H = 24
+const SPAN_H = 11
+const SPAN_W = 16
+const LANE_LABEL_W = 56
+const TIMELINE_H = 88
+
+const LANES = [
+  { id: 0, key: 'input', kinds: ['user', 'context'] },
+  { id: 1, key: 'model', kinds: ['thinking', 'message'] },
+  { id: 2, key: 'tools', kinds: ['tool', 'subagent', 'approval', 'error'] }
+]
 
 const store = { api: null }
 
@@ -35,14 +43,14 @@ const $viewKey = atom('')
 const $selected = atom(null)
 
 const KIND = {
-  user: { lane: 0, color: 'var(--ui-accent)' },
-  context: { lane: 0, color: 'var(--success, #34d399)' },
-  thinking: { lane: 1, color: 'color-mix(in srgb, var(--ui-accent) 35%, #818cf8)' },
-  message: { lane: 1, color: 'color-mix(in srgb, var(--ui-accent) 40%, #c084fc)' },
-  tool: { lane: 2, color: 'var(--warning, #f5a524)' },
-  subagent: { lane: 2, color: '#22d3ee' },
-  approval: { lane: 2, color: '#facc15' },
-  error: { lane: 2, color: 'var(--destructive, #f31260)' }
+  user: { lane: 0, color: '#3b82f6' },
+  context: { lane: 0, color: '#22c55e' },
+  thinking: { lane: 1, color: '#7c3aed' },
+  message: { lane: 1, color: '#f43f5e' },
+  tool: { lane: 2, color: '#f97316' },
+  subagent: { lane: 2, color: '#06b6d4' },
+  approval: { lane: 2, color: '#a3e635' },
+  error: { lane: 2, color: '#ef4444' }
 }
 
 const KIND_ALIAS = {
@@ -66,25 +74,25 @@ const LOCALES = {
     help: 'Help: Trajectory',
     helpBody: 'Right-hand column. Scroll the color bar. One history per chat and bot.',
     none: 'No trajectory',
-    lane: { input: 'In', model: 'Model', tools: 'Tools' },
+    lane: { input: 'Prompt', model: 'Model', tools: 'Tools' },
     kind: {
-      user: 'YOU',
+      user: 'PROMPT',
       context: 'CTX',
       thinking: 'THINK',
-      message: 'OUT',
+      message: 'REPLY',
       tool: 'TOOL',
-      subagent: 'AGENT',
-      approval: 'ASK',
+      subagent: 'TASK',
+      approval: 'WAIT',
       error: 'ERR'
     },
     legend: {
-      user: 'You',
+      user: 'Prompt',
       context: 'Context',
       thinking: 'Think',
       message: 'Reply',
       tool: 'Tool',
-      subagent: 'Subagent',
-      approval: 'Ask',
+      subagent: 'Subtask',
+      approval: 'Confirm',
       error: 'Error'
     },
     evt: {
@@ -117,26 +125,26 @@ const LOCALES = {
     help: '轨迹说明',
     helpBody: '右边单独一列。色轴可左右滑。换会话或换 bot 各看各的。',
     none: '还没有轨迹',
-    lane: { input: '输入', model: '模型', tools: '工具' },
+    lane: { input: '提问区', model: '模型区', tools: '工具区' },
     kind: {
-      user: '你',
+      user: '提问',
       context: '上下文',
       thinking: '思考',
-      message: '回复',
+      message: '回答',
       tool: '工具',
-      subagent: '子代理',
-      approval: '询问',
-      error: '错误'
+      subagent: '子任务',
+      approval: '待确认',
+      error: '出错'
     },
     legend: {
-      user: '你',
+      user: '提问',
       context: '上下文',
       thinking: '思考',
-      message: '回复',
+      message: '回答',
       tool: '工具',
-      subagent: '子代理',
-      approval: '询问',
-      error: '错误'
+      subagent: '子任务',
+      approval: '待确认',
+      error: '出错'
     },
     evt: {
       round: (n) => `第 ${n} 轮`,
@@ -168,26 +176,26 @@ const LOCALES = {
     help: '軌跡說明',
     helpBody: '右邊獨立一欄。色軸可左右滑。切會話或切 bot 各自獨立。',
     none: '還沒有軌跡',
-    lane: { input: '輸入', model: '模型', tools: '工具' },
+    lane: { input: '提問區', model: '模型區', tools: '工具區' },
     kind: {
-      user: '你',
+      user: '提問',
       context: '上下文',
       thinking: '思考',
-      message: '回覆',
+      message: '回答',
       tool: '工具',
-      subagent: '子代理',
-      approval: '詢問',
-      error: '錯誤'
+      subagent: '子任務',
+      approval: '待確認',
+      error: '出錯'
     },
     legend: {
-      user: '你',
+      user: '提問',
       context: '上下文',
       thinking: '思考',
-      message: '回覆',
+      message: '回答',
       tool: '工具',
-      subagent: '子代理',
-      approval: '詢問',
-      error: '錯誤'
+      subagent: '子任務',
+      approval: '待確認',
+      error: '出錯'
     },
     evt: {
       round: (n) => `第 ${n} 輪`,
@@ -219,24 +227,24 @@ const LOCALES = {
     help: '軌跡の説明',
     helpBody: '右側の独立列。カラーバーは横に送れます。会話・bot ごとに分かれます。',
     none: '軌跡なし',
-    lane: { input: '入力', model: 'モデル', tools: 'ツール' },
+    lane: { input: '質問', model: 'モデル', tools: 'ツール' },
     kind: {
-      user: 'あなた',
+      user: '質問',
       context: '文脈',
       thinking: '思考',
-      message: '応答',
+      message: '回答',
       tool: 'ツール',
-      subagent: '子',
+      subagent: '子任務',
       approval: '確認',
       error: 'エラー'
     },
     legend: {
-      user: 'あなた',
+      user: '質問',
       context: '文脈',
       thinking: '思考',
-      message: '応答',
+      message: '回答',
       tool: 'ツール',
-      subagent: '子エージェント',
+      subagent: '子任務',
       approval: '確認',
       error: 'エラー'
     },
@@ -270,25 +278,25 @@ const LOCALES = {
     help: 'شرح المسار',
     helpBody: 'عمود مستقل على اليمين. حرّك شريط الألوان. لكل محادثة وبوت سجله.',
     none: 'لا مسار',
-    lane: { input: 'دخل', model: 'نموذج', tools: 'أدوات' },
+    lane: { input: 'سؤال', model: 'نموذج', tools: 'أدوات' },
     kind: {
-      user: 'أنت',
+      user: 'سؤال',
       context: 'سياق',
       thinking: 'فكر',
       message: 'رد',
       tool: 'أداة',
-      subagent: 'فرع',
-      approval: 'سؤال',
+      subagent: 'مهمة',
+      approval: 'انتظار',
       error: 'خطأ'
     },
     legend: {
-      user: 'أنت',
+      user: 'سؤال',
       context: 'سياق',
       thinking: 'تفكير',
       message: 'رد',
       tool: 'أداة',
-      subagent: 'وكيل فرعي',
-      approval: 'سؤال',
+      subagent: 'مهمة فرعية',
+      approval: 'انتظار',
       error: 'خطأ'
     },
     evt: {
@@ -511,34 +519,43 @@ function Timeline({ t }) {
       background: 'var(--ui-bg-secondary, transparent)'
     },
     children: jsxs('div', {
-      style: { display: 'grid', gridTemplateColumns: '40px minmax(0, 1fr)', height: 56 },
+      style: { display: 'grid', gridTemplateColumns: `${LANE_LABEL_W}px minmax(0, 1fr)`, height: TIMELINE_H },
       children: [
         jsx('div', {
           style: {
             position: 'relative',
             borderRight: '1px solid var(--ui-stroke-secondary)',
-            color: 'var(--ui-text-quaternary)',
-            fontSize: 10
+            color: 'var(--ui-text-tertiary)',
+            fontSize: 11,
+            fontWeight: 600
           },
-          children: [
-            ['input', 0],
-            ['model', 1],
-            ['tools', 2]
-          ].map(([k, i]) =>
-            jsx(
-              'span',
+          children: LANES.map((lane) =>
+            jsxs(
+              'div',
               {
                 style: {
                   position: 'absolute',
-                  right: 4,
-                  top: 8 + i * LANE_H,
-                  height: SPAN_H,
+                  left: 6,
+                  right: 6,
+                  top: 8 + lane.id * LANE_H,
+                  height: SPAN_H + 6,
                   display: 'flex',
                   alignItems: 'center'
                 },
-                children: tx(t, `lane.${k}`, k)
+                children: [
+                  jsx('span', {
+                    style: {
+                      width: 6,
+                      height: 6,
+                      borderRadius: 1,
+                      marginRight: 5,
+                      background: KIND[lane.kinds[0]].color
+                    }
+                  }),
+                  tx(t, `lane.${lane.key}`, lane.key)
+                ]
               },
-              k
+              lane.key
             )
           )
         }),
@@ -561,8 +578,25 @@ function Timeline({ t }) {
           },
           style: { position: 'relative', overflowX: 'auto', overflowY: 'hidden', cursor: 'ew-resize' },
           children: jsx('div', {
-            style: { position: 'relative', width, height: 56, minWidth: '100%' },
-            children:
+            style: { position: 'relative', width, height: TIMELINE_H, minWidth: '100%' },
+            children: [
+              ...LANES.map((lane) =>
+                jsx(
+                  'div',
+                  {
+                    style: {
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      top: 8 + lane.id * LANE_H + SPAN_H + 4,
+                      height: 1,
+                      background: 'var(--ui-stroke-secondary)',
+                      opacity: 0.45
+                    }
+                  },
+                  `rule-${lane.key}`
+                )
+              ),
               events.length === 0
                 ? jsx('div', {
                     style: {
@@ -587,20 +621,21 @@ function Timeline({ t }) {
                           position: 'absolute',
                           top: 8 + meta.lane * LANE_H,
                           left: i * SPAN_W + 1,
-                          width: SPAN_W - 2,
+                          width: SPAN_W - 3,
                           height: SPAN_H,
                           border: 'none',
-                          borderRadius: 1,
+                          borderRadius: 2,
                           padding: 0,
                           cursor: 'pointer',
                           background: colorOf(ev.kind, ev.error),
-                          opacity: selected && selected !== ev.id ? 0.22 : ev.running ? 1 : 0.88,
+                          opacity: selected && selected !== ev.id ? 0.22 : ev.running ? 1 : 0.92,
                           boxShadow: selected === ev.id ? '0 0 0 1px var(--ui-accent)' : 'none'
                         }
                       },
                       `${ev.at}-${ev.id}`
                     )
                   })
+            ]
           })
         })
       ]
@@ -609,30 +644,51 @@ function Timeline({ t }) {
 }
 
 function Legend({ t }) {
-  const items = ['user', 'context', 'thinking', 'message', 'tool', 'subagent', 'approval', 'error']
   return jsx('div', {
     style: {
-      display: 'flex',
-      flexWrap: 'wrap',
-      gap: '7px 10px',
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr 1fr',
+      gap: 8,
       padding: '8px 10px',
       borderBottom: '1px solid var(--ui-stroke-secondary)',
       fontSize: 11,
       color: 'var(--ui-text-tertiary)'
     },
-    children: items.map((kind) =>
+    children: LANES.map((lane) =>
       jsxs(
-        'span',
+        'div',
         {
-          style: { display: 'inline-flex', alignItems: 'center', gap: 5 },
+          style: {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 5,
+            minWidth: 0,
+            paddingRight: 6,
+            borderRight: lane.id < 2 ? '1px solid var(--ui-stroke-secondary)' : 'none'
+          },
           children: [
-            jsx('span', {
-              style: { width: 10, height: 8, borderRadius: 1, background: colorOf(kind, kind === 'error') }
+            jsx('div', {
+              style: { fontWeight: 600, color: 'var(--ui-text-secondary)', marginBottom: 1 },
+              children: tx(t, `lane.${lane.key}`, lane.key)
             }),
-            tx(t, `legend.${kind}`, kind)
+            ...lane.kinds.map((kind) =>
+              jsxs(
+                'span',
+                {
+                  style: { display: 'inline-flex', alignItems: 'center', gap: 6 },
+                  children: [
+                    jsx('span', {
+                      style: { width: 10, height: 10, borderRadius: 2, background: colorOf(kind, kind === 'error') }
+                    }),
+                    tx(t, `legend.${kind}`, kind)
+                  ]
+                },
+                kind
+              )
+            )
           ]
         },
-        kind
+        lane.key
       )
     )
   })
@@ -646,38 +702,37 @@ function EventRow({ ev, now, t }) {
   return jsxs('button', {
     type: 'button',
     onClick: () => $selected.set(ev.id === selected ? null : ev.id),
-    className: cn('flex w-full items-center gap-2 px-2.5 text-left'),
+    className: 'w-full text-left',
     style: {
-      height: 36,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 2,
+      padding: '6px 7px',
       border: '1px solid var(--ui-stroke-secondary)',
       borderRadius: 8,
       background: selected === ev.id ? 'color-mix(in srgb, var(--ui-accent) 10%, transparent)' : 'transparent'
     },
     children: [
-      jsx('span', {
-        className: 'w-7 shrink-0 tabular-nums text-[11px] text-(--ui-text-quaternary)',
-        children: ev.id
+      jsxs('span', {
+        style: { display: 'flex', alignItems: 'center', gap: 6 },
+        children: [
+          jsx('span', { style: { width: 8, height: 8, borderRadius: 2, background: c, flex: 'none' } }),
+          jsx('span', {
+            style: { fontSize: 10, fontWeight: 600, color: c },
+            children: tx(t, `kind.${vk}`, vk)
+          }),
+          dur
+            ? jsx('span', {
+                style: { marginLeft: 'auto', fontSize: 10, color: 'var(--ui-text-quaternary)' },
+                children: ev.running ? `${dur}…` : dur
+              })
+            : null
+        ]
       }),
       jsx('span', {
-        className:
-          'inline-flex h-[22px] min-w-[52px] shrink-0 items-center justify-center rounded-md px-1 text-[10px] font-medium',
-        style: {
-          color: c,
-          background: `color-mix(in srgb, ${c} 16%, transparent)`,
-          border: `1px solid color-mix(in srgb, ${c} 35%, transparent)`
-        },
-        children: tx(t, `kind.${vk}`, vk)
-      }),
-      jsx('span', {
-        className: 'min-w-0 flex-1 truncate text-[12px] text-foreground',
+        className: 'truncate text-[12px] text-foreground',
         children: eventText(t, ev)
-      }),
-      dur
-        ? jsx('span', {
-            className: 'shrink-0 tabular-nums text-[11px] text-(--ui-text-quaternary)',
-            children: ev.running ? `${dur}…` : dur
-          })
-        : null
+      })
     ]
   })
 }
@@ -745,8 +800,41 @@ function TrajectoryPane() {
         : jsx('div', {
             className: 'min-h-0 flex-1 overflow-y-auto',
             children: jsx('div', {
-              className: 'flex flex-col gap-1.5 p-2',
-              children: [...events].reverse().map((ev) => jsx(EventRow, { ev, now, t }, `${ev.at}-${ev.id}`))
+              style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, padding: 8, alignItems: 'start' },
+              children: LANES.map((lane) => {
+                const rows = [...events].reverse().filter((ev) => kindMeta(ev.kind).lane === lane.id)
+                return jsxs(
+                  'div',
+                  {
+                    style: {
+                      minWidth: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                      paddingRight: 6,
+                      borderRight: lane.id < 2 ? '1px solid var(--ui-stroke-secondary)' : 'none'
+                    },
+                    children: [
+                      jsx('div', {
+                        style: {
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: 'var(--ui-text-secondary)',
+                          padding: '0 2px'
+                        },
+                        children: tx(t, `lane.${lane.key}`, lane.key)
+                      }),
+                      rows.length
+                        ? rows.map((ev) => jsx(EventRow, { ev, now, t }, `${ev.at}-${ev.id}`))
+                        : jsx('div', {
+                            style: { fontSize: 11, color: 'var(--ui-text-quaternary)', padding: '4px 2px' },
+                            children: '—'
+                          })
+                    ]
+                  },
+                  lane.key
+                )
+              })
             })
           })
     ]
