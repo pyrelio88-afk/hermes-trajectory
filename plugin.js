@@ -23,6 +23,7 @@ import { useEffect, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
 const ID = 'harness-progress'
+const VERSION = '0.0.1'
 const MAX_EVENTS = 240
 const LANE_H = 24
 const SPAN_H = 11
@@ -1301,6 +1302,7 @@ function finishOpen(key, bag) {
 export default {
   id: ID,
   name: 'Trajectory',
+  version: VERSION,
   defaultEnabled: true,
   register(ctx) {
     store.api = ctx.storage
