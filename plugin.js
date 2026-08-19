@@ -13,6 +13,7 @@ import {
   cn,
   host,
   PALETTE_AREA,
+  SegmentedControl,
   STATUSBAR_AREAS,
   Tip,
   usePluginI18n,
@@ -26,8 +27,9 @@ const MAX_EVENTS = 240
 const LANE_H = 24
 const SPAN_H = 11
 const SPAN_W = 16
-const LANE_LABEL_W = 56
+const LANE_LABEL_W = 44
 const TIMELINE_H = 88
+const VIEWS = ['board', 'list', 'table', 'time']
 
 const LANES = [
   { id: 0, key: 'input', kinds: ['user', 'context'] },
@@ -42,11 +44,13 @@ const $aliases = atom({})
 const $viewKey = atom('')
 const $selected = atom(null)
 
+const $mode = atom('board')
+
 const KIND = {
   user: { lane: 0, color: '#3b82f6' },
   context: { lane: 0, color: '#22c55e' },
   thinking: { lane: 1, color: '#7c3aed' },
-  message: { lane: 1, color: '#f43f5e' },
+  message: { lane: 1, color: '#e4e4e7' },
   tool: { lane: 2, color: '#f97316' },
   subagent: { lane: 2, color: '#06b6d4' },
   approval: { lane: 2, color: '#a3e635' },
@@ -71,6 +75,7 @@ const LOCALES = {
     steps: (n) => `${n} steps`,
     running: (tags) => `Live ${tags}`,
     clear: 'Clear this chat',
+    view: { board: 'Board', list: 'List', table: 'Table', time: 'Time' },
     help: 'Help: Trajectory',
     helpBody: 'Right-hand column. Scroll the color bar. One history per chat and bot.',
     none: 'No trajectory',
@@ -122,10 +127,11 @@ const LOCALES = {
     steps: (n) => `${n} 步`,
     running: (tags) => `进行中 ${tags}`,
     clear: '清空本场',
+    view: { board: '看板', list: '列表', table: '表格', time: '时间' },
     help: '轨迹说明',
     helpBody: '右边单独一列。色轴可左右滑。换会话或换 bot 各看各的。',
     none: '还没有轨迹',
-    lane: { input: '提问区', model: '模型区', tools: '工具区' },
+    lane: { input: '提问', model: '模型', tools: '工具' },
     kind: {
       user: '提问',
       context: '上下文',
@@ -173,10 +179,11 @@ const LOCALES = {
     steps: (n) => `${n} 步`,
     running: (tags) => `進行中 ${tags}`,
     clear: '清空本場',
+    view: { board: '看板', list: '列表', table: '表格', time: '時間' },
     help: '軌跡說明',
     helpBody: '右邊獨立一欄。色軸可左右滑。切會話或切 bot 各自獨立。',
     none: '還沒有軌跡',
-    lane: { input: '提問區', model: '模型區', tools: '工具區' },
+    lane: { input: '提問', model: '模型', tools: '工具' },
     kind: {
       user: '提問',
       context: '上下文',
@@ -224,6 +231,7 @@ const LOCALES = {
     steps: (n) => `${n} ステップ`,
     running: (tags) => `実行中 ${tags}`,
     clear: 'この会話を消去',
+    view: { board: 'ボード', list: 'リスト', table: '表', time: '時間' },
     help: '軌跡の説明',
     helpBody: '右側の独立列。カラーバーは横に送れます。会話・bot ごとに分かれます。',
     none: '軌跡なし',
@@ -275,6 +283,7 @@ const LOCALES = {
     steps: (n) => `${n} خطوة`,
     running: (tags) => `جارٍ ${tags}`,
     clear: 'مسح هذه المحادثة',
+    view: { board: 'لوحة', list: 'قائمة', table: 'جدول', time: 'زمن' },
     help: 'شرح المسار',
     helpBody: 'عمود مستقل على اليمين. حرّك شريط الألوان. لكل محادثة وبوت سجله.',
     none: 'لا مسار',
@@ -413,11 +422,18 @@ function persist() {
     store.api &&
       store.api.set('traj-v3', {
         buckets: $buckets.get(),
-        aliases: $aliases.get()
+        aliases: $aliases.get(),
+        mode: $mode.get()
       })
   } catch {
     /* ignore */
   }
+}
+
+function setMode(id) {
+  if (!VIEWS.includes(id)) return
+  $mode.set(id)
+  persist()
 }
 
 function writeBucket(key, next) {
@@ -530,30 +546,21 @@ function Timeline({ t }) {
             fontWeight: 600
           },
           children: LANES.map((lane) =>
-            jsxs(
+            jsx(
               'div',
               {
                 style: {
                   position: 'absolute',
-                  left: 6,
-                  right: 6,
+                  left: 4,
+                  right: 4,
                   top: 8 + lane.id * LANE_H,
                   height: SPAN_H + 6,
                   display: 'flex',
-                  alignItems: 'center'
+                  alignItems: 'center',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden'
                 },
-                children: [
-                  jsx('span', {
-                    style: {
-                      width: 6,
-                      height: 6,
-                      borderRadius: 1,
-                      marginRight: 5,
-                      background: KIND[lane.kinds[0]].color
-                    }
-                  }),
-                  tx(t, `lane.${lane.key}`, lane.key)
-                ]
+                children: tx(t, `lane.${lane.key}`, lane.key)
               },
               lane.key
             )
@@ -737,15 +744,177 @@ function EventRow({ ev, now, t }) {
   })
 }
 
+function clock(ts) {
+  const d = new Date(ts)
+  const p = (n) => String(n).padStart(2, '0')
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
+
+function BoardView({ events, now, t }) {
+  return jsx('div', {
+    style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, padding: 8, alignItems: 'start' },
+    children: LANES.map((lane) => {
+      const rows = [...events].reverse().filter((ev) => kindMeta(ev.kind).lane === lane.id)
+      return jsxs(
+        'div',
+        {
+          style: {
+            minWidth: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+            paddingRight: 6,
+            borderRight: lane.id < 2 ? '1px solid var(--ui-stroke-secondary)' : 'none'
+          },
+          children: [
+            jsx('div', {
+              style: { fontSize: 11, fontWeight: 600, color: 'var(--ui-text-secondary)' },
+              children: tx(t, `lane.${lane.key}`, lane.key)
+            }),
+            rows.length
+              ? rows.map((ev) => jsx(EventRow, { ev, now, t }, `${ev.at}-${ev.id}`))
+              : jsx('div', { style: { fontSize: 11, color: 'var(--ui-text-quaternary)' }, children: '—' })
+          ]
+        },
+        lane.key
+      )
+    })
+  })
+}
+
+function ListView({ events, now, t }) {
+  return jsx('div', {
+    style: { display: 'flex', flexDirection: 'column', gap: 6, padding: 8 },
+    children: [...events].reverse().map((ev) => jsx(EventRow, { ev, now, t }, `${ev.at}-${ev.id}`))
+  })
+}
+
+function TableView({ events, now, t }) {
+  const rows = [...events].reverse()
+  return jsxs('div', {
+    style: { padding: 8 },
+    children: [
+      jsxs('div', {
+        style: {
+          display: 'grid',
+          gridTemplateColumns: '64px 44px 56px minmax(0, 1fr) 44px',
+          gap: 6,
+          fontSize: 10,
+          color: 'var(--ui-text-quaternary)',
+          padding: '0 4px 6px'
+        },
+        children: [
+          jsx('span', { children: '' }),
+          jsx('span', { children: '' }),
+          jsx('span', { children: '' }),
+          jsx('span', { children: '' }),
+          jsx('span', { children: '' })
+        ]
+      }),
+      ...rows.map((ev) => {
+        const vk = visualKind(ev.kind)
+        const c = colorOf(ev.kind, ev.error)
+        const dur = ev.running ? formatElapsed(now - ev.at) : ev.ms != null ? formatElapsed(ev.ms) : ''
+        return jsxs(
+          'button',
+          {
+            type: 'button',
+            onClick: () => $selected.set(ev.id),
+            style: {
+              display: 'grid',
+              gridTemplateColumns: '64px 44px 56px minmax(0, 1fr) 44px',
+              gap: 6,
+              width: '100%',
+              textAlign: 'left',
+              alignItems: 'center',
+              padding: '6px 4px',
+              border: 'none',
+              borderBottom: '1px solid var(--ui-stroke-secondary)',
+              background: 'transparent',
+              color: 'var(--ui-text-secondary)',
+              fontSize: 11
+            },
+            children: [
+              jsx('span', { style: { color: 'var(--ui-text-quaternary)' }, children: clock(ev.at) }),
+              jsx('span', { children: tx(t, `lane.${LANES[kindMeta(ev.kind).lane].key}`, '') }),
+              jsx('span', { style: { color: c, fontWeight: 600 }, children: tx(t, `kind.${vk}`, vk) }),
+              jsx('span', { className: 'truncate', children: eventText(t, ev) }),
+              jsx('span', { style: { color: 'var(--ui-text-quaternary)' }, children: ev.running ? `${dur}…` : dur })
+            ]
+          },
+          `${ev.at}-${ev.id}`
+        )
+      })
+    ]
+  })
+}
+
+function TimeView({ events, now, t }) {
+  return jsx('div', {
+    style: { display: 'flex', flexDirection: 'column', gap: 0, padding: '8px 10px' },
+    children: [...events].reverse().map((ev, i, arr) => {
+      const vk = visualKind(ev.kind)
+      const c = colorOf(ev.kind, ev.error)
+      const dur = ev.running ? formatElapsed(now - ev.at) : ev.ms != null ? formatElapsed(ev.ms) : ''
+      return jsxs(
+        'div',
+        {
+          style: { display: 'grid', gridTemplateColumns: '56px 14px minmax(0, 1fr)', gap: 8 },
+          children: [
+            jsx('span', {
+              style: { fontSize: 10, color: 'var(--ui-text-quaternary)', paddingTop: 2 },
+              children: clock(ev.at)
+            }),
+            jsxs('div', {
+              style: { position: 'relative', display: 'flex', justifyContent: 'center' },
+              children: [
+                i < arr.length - 1
+                  ? jsx('div', {
+                      style: {
+                        position: 'absolute',
+                        top: 10,
+                        bottom: -10,
+                        width: 1,
+                        background: 'var(--ui-stroke-secondary)'
+                      }
+                    })
+                  : null,
+                jsx('div', {
+                  style: { width: 8, height: 8, borderRadius: 99, background: c, marginTop: 4, zIndex: 1 }
+                })
+              ]
+            }),
+            jsxs('div', { style: { paddingBottom: 12 }, children: [
+              jsx('div', { style: { fontSize: 11, fontWeight: 600, color: c }, children: tx(t, `kind.${vk}`, vk) }),
+              jsx('div', { className: 'truncate text-[12px] text-foreground', children: eventText(t, ev) }),
+              dur
+                ? jsx('div', { style: { fontSize: 10, color: 'var(--ui-text-quaternary)' }, children: ev.running ? `${dur}…` : dur })
+                : null
+            ] })
+          ]
+        },
+        `${ev.at}-${ev.id}`
+      )
+    })
+  })
+}
+
 function TrajectoryPane() {
   const t = usePluginI18n(ID)
   const events = useViewEvents()
   const key = useValue($viewKey)
+  const mode = useValue($mode)
   const busy = useValue(host.state.busy)
   const now = useNow(busy || events.some((e) => e.running))
-  const running = events.filter((e) => e.running)
   const [bot, sess] = (key || 'default::draft').split('::')
-  const tags = running.map((e) => tx(t, `kind.${visualKind(e.kind)}`, e.kind)).join(' · ')
+  const viewBody =
+    mode === 'list'
+      ? jsx(ListView, { events, now, t })
+      : mode === 'table'
+        ? jsx(TableView, { events, now, t })
+        : mode === 'time'
+          ? jsx(TimeView, { events, now, t })
+          : jsx(BoardView, { events, now, t })
 
   return jsxs('div', {
     className: 'flex h-full min-h-0 flex-col',
@@ -764,26 +933,31 @@ function TrajectoryPane() {
       jsx(Timeline, { t }),
       jsx(Legend, { t }),
       jsxs('div', {
-        className: 'flex items-center justify-between gap-2 px-2.5 py-1.5 text-[11px] text-(--ui-text-quaternary)',
+        className: 'flex items-center justify-between gap-2 px-2.5 py-1.5',
+        style: { borderBottom: '1px solid var(--ui-stroke-secondary)' },
         children: [
-          jsx('span', {
-            children: running.length
-              ? tx(t, 'running', '', tags)
-              : events.length
-                ? tx(t, 'steps', `${events.length}`, events.length)
-                : tx(t, 'idle', '')
+          jsx(SegmentedControl, {
+            value: mode,
+            onChange: setMode,
+            options: VIEWS.map((id) => ({ id, label: tx(t, `view.${id}`, id) }))
           }),
-          events.length
-            ? jsx('button', {
-                type: 'button',
-                className: 'text-(--ui-text-tertiary) hover:text-foreground',
-                onClick: () => {
-                  for (const k of relatedKeys($viewKey.get())) writeBucket(k, emptyBucket())
-                  $selected.set(null)
-                },
-                children: tx(t, 'clear', 'Clear')
-              })
-            : null
+          jsxs('div', {
+            className: 'flex items-center gap-2 text-[11px] text-(--ui-text-quaternary)',
+            children: [
+              jsx('span', { children: events.length ? tx(t, 'steps', `${events.length}`, events.length) : tx(t, 'idle', '') }),
+              events.length
+                ? jsx('button', {
+                    type: 'button',
+                    className: 'text-(--ui-text-tertiary) hover:text-foreground',
+                    onClick: () => {
+                      for (const k of relatedKeys($viewKey.get())) writeBucket(k, emptyBucket())
+                      $selected.set(null)
+                    },
+                    children: tx(t, 'clear', 'Clear')
+                  })
+                : null
+            ]
+          })
         ]
       }),
       events.length === 0
@@ -797,46 +971,7 @@ function TrajectoryPane() {
               })
             ]
           })
-        : jsx('div', {
-            className: 'min-h-0 flex-1 overflow-y-auto',
-            children: jsx('div', {
-              style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, padding: 8, alignItems: 'start' },
-              children: LANES.map((lane) => {
-                const rows = [...events].reverse().filter((ev) => kindMeta(ev.kind).lane === lane.id)
-                return jsxs(
-                  'div',
-                  {
-                    style: {
-                      minWidth: 0,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 6,
-                      paddingRight: 6,
-                      borderRight: lane.id < 2 ? '1px solid var(--ui-stroke-secondary)' : 'none'
-                    },
-                    children: [
-                      jsx('div', {
-                        style: {
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: 'var(--ui-text-secondary)',
-                          padding: '0 2px'
-                        },
-                        children: tx(t, `lane.${lane.key}`, lane.key)
-                      }),
-                      rows.length
-                        ? rows.map((ev) => jsx(EventRow, { ev, now, t }, `${ev.at}-${ev.id}`))
-                        : jsx('div', {
-                            style: { fontSize: 11, color: 'var(--ui-text-quaternary)', padding: '4px 2px' },
-                            children: '—'
-                          })
-                    ]
-                  },
-                  lane.key
-                )
-              })
-            })
-          })
+        : jsx('div', { className: 'min-h-0 flex-1 overflow-y-auto', children: viewBody })
     ]
   })
 }
@@ -899,6 +1034,7 @@ export default {
       if (saved.buckets) {
         $buckets.set(saved.buckets)
         if (saved.aliases) $aliases.set(saved.aliases)
+        if (VIEWS.includes(saved.mode)) $mode.set(saved.mode)
       } else {
         $buckets.set(saved)
       }
@@ -1041,7 +1177,7 @@ export default {
       }
       if (type === 'session.usage') {
         const last = lastOf(key, 'context', false)
-        if (!last || Date.now() - last.at > 4000) pushEvent(key, 'context', { textKey: 'evt.context' })
+        if (!last || Date.now() - last.at > 20000) pushEvent(key, 'context', { textKey: 'evt.context' })
         return
       }
       if (type === 'message.complete') {
