@@ -16,7 +16,7 @@ Hermes Desktop 右侧「轨迹」面板。一场对话分成三道：提问、�
 
 ⌘K → **Reload desktop plugins**。设置 → 插件里打开 **Trajectory**。
 
-只进 default，不要拷到 wechat-bot。
+任意 profile 都能加载。每个 profile、每场对话各自一份布局。
 
 ## 视图
 

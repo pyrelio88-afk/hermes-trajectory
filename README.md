@@ -16,7 +16,7 @@ Drop `plugin.js` here (folder name must equal plugin id):
 
 Command palette → **Reload desktop plugins**. Enable **Trajectory** in Settings → Plugins.
 
-Default profile only. Do not copy it into wechat-bot.
+Works in any profile. Each profile and chat keeps its own layout.
 
 ## Views
 
