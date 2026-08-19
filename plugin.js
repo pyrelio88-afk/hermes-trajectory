@@ -29,7 +29,7 @@ const SPAN_H = 11
 const SPAN_W = 16
 const LANE_LABEL_W = 44
 const TIMELINE_H = 88
-const VIEWS = ['board', 'list', 'table', 'time']
+const VIEWS = ['table', 'list', 'board', 'time']
 
 const LANES = [
   { id: 0, key: 'input', kinds: ['user', 'context'] },
@@ -44,17 +44,65 @@ const $aliases = atom({})
 const $viewKey = atom('')
 const $selected = atom(null)
 
-const $mode = atom('board')
+const $mode = atom('table')
+const $theme = atom('china')
+const $diy = atom(null)
+const $paint = atom(false)
+
+const THEMES = {
+  china: {
+    user: '#4b5cc4',
+    context: '#789262',
+    thinking: '#801dae',
+    message: '#d6ecf0',
+    tool: '#ff8936',
+    subagent: '#30dff3',
+    approval: '#d9b611',
+    error: '#c3272b'
+  },
+  qinghua: {
+    user: '#177cb0',
+    context: '#065279',
+    thinking: '#3d3b4f',
+    message: '#e9f1f6',
+    tool: '#4b5cc4',
+    subagent: '#30dff3',
+    approval: '#d6ecf0',
+    error: '#c3272b'
+  },
+  zhumo: {
+    user: '#3d3b4f',
+    context: '#574266',
+    thinking: '#801dae',
+    message: '#e9f1f6',
+    tool: '#ff4e20',
+    subagent: '#ff8936',
+    approval: '#ffc773',
+    error: '#c3272b'
+  },
+  bright: {
+    user: '#3b82f6',
+    context: '#22c55e',
+    thinking: '#7c3aed',
+    message: '#e4e4e7',
+    tool: '#f97316',
+    subagent: '#06b6d4',
+    approval: '#ec4899',
+    error: '#ef4444'
+  }
+}
+
+const KIND_KEYS = ['user', 'context', 'thinking', 'message', 'tool', 'subagent', 'approval', 'error']
 
 const KIND = {
-  user: { lane: 0, color: '#3b82f6' },
-  context: { lane: 0, color: '#22c55e' },
-  thinking: { lane: 1, color: '#7c3aed' },
-  message: { lane: 1, color: '#e4e4e7' },
-  tool: { lane: 2, color: '#f97316' },
-  subagent: { lane: 2, color: '#06b6d4' },
-  approval: { lane: 2, color: '#a3e635' },
-  error: { lane: 2, color: '#ef4444' }
+  user: { lane: 0, color: THEMES.china.user },
+  context: { lane: 0, color: THEMES.china.context },
+  thinking: { lane: 1, color: THEMES.china.thinking },
+  message: { lane: 1, color: THEMES.china.message },
+  tool: { lane: 2, color: THEMES.china.tool },
+  subagent: { lane: 2, color: THEMES.china.subagent },
+  approval: { lane: 2, color: THEMES.china.approval },
+  error: { lane: 2, color: THEMES.china.error }
 }
 
 const KIND_ALIAS = {
@@ -76,6 +124,9 @@ const LOCALES = {
     running: (tags) => `Live ${tags}`,
     clear: 'Clear this chat',
     view: { board: 'Board', list: 'List', table: 'Table', time: 'Time' },
+    theme: { china: 'China', qinghua: 'Qinghua', zhumo: 'Cinnabar', bright: 'Bright', diy: 'Custom', open: 'Colors' },
+    when: { today: 'Today' },
+    col: { time: 'Time', lane: 'Lane', kind: 'Kind', text: 'What', dur: 'Dur' },
     help: 'Help: Trajectory',
     helpBody: 'Right-hand column. Scroll the color bar. One history per chat and bot.',
     none: 'No trajectory',
@@ -128,6 +179,9 @@ const LOCALES = {
     running: (tags) => `进行中 ${tags}`,
     clear: '清空本场',
     view: { board: '看板', list: '列表', table: '表格', time: '时间' },
+    theme: { china: '中国色', qinghua: '青花', zhumo: '朱墨', bright: '现行', diy: '自己选', open: '配色' },
+    when: { today: '今天' },
+    col: { time: '时间', lane: '列', kind: '种类', text: '内容', dur: '耗时' },
     help: '轨迹说明',
     helpBody: '右边单独一列。色轴可左右滑。换会话或换 bot 各看各的。',
     none: '还没有轨迹',
@@ -180,6 +234,9 @@ const LOCALES = {
     running: (tags) => `進行中 ${tags}`,
     clear: '清空本場',
     view: { board: '看板', list: '列表', table: '表格', time: '時間' },
+    theme: { china: '中國色', qinghua: '青花', zhumo: '朱墨', bright: '現行', diy: '自選', open: '配色' },
+    when: { today: '今天' },
+    col: { time: '時間', lane: '欄', kind: '種類', text: '內容', dur: '耗時' },
     help: '軌跡說明',
     helpBody: '右邊獨立一欄。色軸可左右滑。切會話或切 bot 各自獨立。',
     none: '還沒有軌跡',
@@ -232,6 +289,9 @@ const LOCALES = {
     running: (tags) => `実行中 ${tags}`,
     clear: 'この会話を消去',
     view: { board: 'ボード', list: 'リスト', table: '表', time: '時間' },
+    theme: { china: '中国色', qinghua: '青花', zhumo: '朱墨', bright: '現行', diy: '自分で', open: '配色' },
+    when: { today: '今日' },
+    col: { time: '時刻', lane: '列', kind: '種類', text: '内容', dur: '時間' },
     help: '軌跡の説明',
     helpBody: '右側の独立列。カラーバーは横に送れます。会話・bot ごとに分かれます。',
     none: '軌跡なし',
@@ -284,6 +344,9 @@ const LOCALES = {
     running: (tags) => `جارٍ ${tags}`,
     clear: 'مسح هذه المحادثة',
     view: { board: 'لوحة', list: 'قائمة', table: 'جدول', time: 'زمن' },
+    theme: { china: 'صيني', qinghua: 'خزف', zhumo: 'حبر', bright: 'واضح', diy: 'خاص', open: 'ألوان' },
+    when: { today: 'اليوم' },
+    col: { time: 'وقت', lane: 'مسار', kind: 'نوع', text: 'ماذا', dur: 'مدة' },
     help: 'شرح المسار',
     helpBody: 'عمود مستقل على اليمين. حرّك شريط الألوان. لكل محادثة وبوت سجله.',
     none: 'لا مسار',
@@ -335,9 +398,64 @@ function kindMeta(name) {
   return KIND[visualKind(name)]
 }
 
+function liveColors() {
+  const id = $theme.get()
+  const base = THEMES[id] || THEMES.china
+  if (id === 'diy') return { ...THEMES.china, ...($diy.get() || {}) }
+  return base
+}
+
 function colorOf(kind, error) {
-  if (error || kind === 'error') return KIND.error.color
-  return kindMeta(kind).color
+  const bag = liveColors()
+  if (error || kind === 'error') return bag.error
+  return bag[visualKind(kind)] || bag.context
+}
+
+function lockTo(id) {
+  $selected.set(id)
+  const run = () => {
+    document.querySelectorAll(`[data-eid="${id}"]`).forEach((el) => {
+      try {
+        el.scrollIntoView({ block: 'nearest', inline: 'center' })
+      } catch {
+        /* ignore */
+      }
+    })
+  }
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run)
+  else run()
+}
+
+function pad2(n) {
+  return String(n).padStart(2, '0')
+}
+
+function when(ts, nowTs) {
+  const d = new Date(ts)
+  const n = new Date(nowTs || Date.now())
+  const hm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`
+  if (d.getFullYear() !== n.getFullYear()) {
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${hm}`
+  }
+  if (d.getMonth() !== n.getMonth() || d.getDate() !== n.getDate()) {
+    return `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${hm}`
+  }
+  return hm
+}
+
+function dayStamp(ts) {
+  const d = new Date(ts)
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+
+function dayLabel(ts, nowTs, t) {
+  const d = new Date(ts)
+  const n = new Date(nowTs || Date.now())
+  if (d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate()) {
+    return tx(t, 'when.today', '今天')
+  }
+  if (d.getFullYear() !== n.getFullYear()) return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+  return `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
 
 function tx(t, key, fallback, ...args) {
@@ -423,16 +541,30 @@ function persist() {
       store.api.set('traj-v3', {
         buckets: $buckets.get(),
         aliases: $aliases.get(),
-        mode: $mode.get()
+        mode: $mode.get(),
+        theme: $theme.get(),
+        diy: $diy.get()
       })
   } catch {
     /* ignore */
   }
 }
 
+function setTheme(id) {
+  $theme.set(id)
+  persist()
+}
+
 function setMode(id) {
   if (!VIEWS.includes(id)) return
   $mode.set(id)
+  persist()
+}
+
+function setDiyColor(kind, hex) {
+  const next = { ...liveColors(), [kind]: hex }
+  $diy.set(next)
+  $theme.set('diy')
   persist()
 }
 
@@ -516,6 +648,8 @@ function useViewEvents() {
 }
 
 function Timeline({ t }) {
+  useValue($theme)
+  useValue($diy)
   const events = useViewEvents()
   const selected = useValue($selected)
   const scroller = useRef(null)
@@ -650,7 +784,43 @@ function Timeline({ t }) {
   })
 }
 
+function ThemeBar({ t }) {
+  const theme = useValue($theme)
+  useValue($diy)
+  const ids = ['china', 'qinghua', 'zhumo', 'bright', 'diy']
+  return jsx('div', {
+    style: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: 6,
+      padding: '8px 10px',
+      borderBottom: '1px solid var(--ui-stroke-secondary)'
+    },
+    children: ids.map((id) =>
+      jsx(
+        'button',
+        {
+          type: 'button',
+          onClick: () => setTheme(id),
+          style: {
+            border: '1px solid var(--ui-stroke-secondary)',
+            borderRadius: 6,
+            padding: '3px 8px',
+            fontSize: 11,
+            background: theme === id ? 'color-mix(in srgb, var(--ui-accent) 16%, transparent)' : 'transparent',
+            color: theme === id ? 'var(--ui-text-primary, var(--foreground))' : 'var(--ui-text-tertiary)'
+          },
+          children: tx(t, `theme.${id}`, id)
+        },
+        id
+      )
+    )
+  })
+}
+
 function Legend({ t }) {
+  useValue($theme)
+  useValue($diy)
   return jsx('div', {
     style: {
       display: 'grid',
@@ -680,12 +850,22 @@ function Legend({ t }) {
             }),
             ...lane.kinds.map((kind) =>
               jsxs(
-                'span',
+                'label',
                 {
-                  style: { display: 'inline-flex', alignItems: 'center', gap: 6 },
+                  style: { display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' },
                   children: [
-                    jsx('span', {
-                      style: { width: 10, height: 10, borderRadius: 2, background: colorOf(kind, kind === 'error') }
+                    jsx('input', {
+                      type: 'color',
+                      value: colorOf(kind, kind === 'error'),
+                      onChange: (e) => setDiyColor(kind, e.target.value),
+                      style: {
+                        width: 14,
+                        height: 14,
+                        padding: 0,
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer'
+                      }
                     }),
                     tx(t, `legend.${kind}`, kind)
                   ]
@@ -703,6 +883,8 @@ function Legend({ t }) {
 
 function EventRow({ ev, now, t }) {
   const selected = useValue($selected)
+  useValue($theme)
+  useValue($diy)
   const vk = visualKind(ev.kind)
   const dur = ev.running ? formatElapsed(now - ev.at) : ev.ms != null ? formatElapsed(ev.ms) : ''
   const c = colorOf(ev.kind, ev.error)
@@ -902,11 +1084,9 @@ function TimeView({ events, now, t }) {
 function TrajectoryPane() {
   const t = usePluginI18n(ID)
   const events = useViewEvents()
-  const key = useValue($viewKey)
   const mode = useValue($mode)
   const busy = useValue(host.state.busy)
   const now = useNow(busy || events.some((e) => e.running))
-  const [bot, sess] = (key || 'default::draft').split('::')
   const viewBody =
     mode === 'list'
       ? jsx(ListView, { events, now, t })
@@ -919,19 +1099,9 @@ function TrajectoryPane() {
   return jsxs('div', {
     className: 'flex h-full min-h-0 flex-col',
     children: [
-      jsxs('div', {
-        className: 'flex items-center justify-between gap-2 border-b px-2.5 py-1.5 text-[11px]',
-        style: { borderColor: 'var(--ui-stroke-secondary)', color: 'var(--ui-text-quaternary)' },
-        children: [
-          jsx(Tip, {
-            label: key,
-            children: jsx('span', { className: 'min-w-0 truncate', children: `${bot} · ${String(sess).slice(0, 10)}` })
-          }),
-          jsx('span', { children: tx(t, 'onlyThis', '') })
-        ]
-      }),
-      jsx(Timeline, { t }),
+      jsx(ThemeBar, { t }),
       jsx(Legend, { t }),
+      jsx(Timeline, { t }),
       jsxs('div', {
         className: 'flex items-center justify-between gap-2 px-2.5 py-1.5',
         style: { borderBottom: '1px solid var(--ui-stroke-secondary)' },
@@ -1035,6 +1205,8 @@ export default {
         $buckets.set(saved.buckets)
         if (saved.aliases) $aliases.set(saved.aliases)
         if (VIEWS.includes(saved.mode)) $mode.set(saved.mode)
+        if (saved.theme) $theme.set(saved.theme)
+        if (saved.diy && typeof saved.diy === 'object') $diy.set(saved.diy)
       } else {
         $buckets.set(saved)
       }
