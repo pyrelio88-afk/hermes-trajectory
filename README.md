@@ -24,7 +24,7 @@ Switch anytime: **Table**, **List**, **Board**, **Time**. The choice is remember
 
 ## Colors
 
-Click a swatch in the legend at any time. Your colors persist. There is no preset strip.
+Click a lane name (**Prompt / Model / Tools**) to add or remove kinds for that column (context, todo, goal, background, compact, …). The three lane names stay fixed. Layout and colors are stored per chat and profile.
 
 ## Language
 

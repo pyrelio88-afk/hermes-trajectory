@@ -31,10 +31,12 @@ const LANE_LABEL_W = 44
 const TIMELINE_H = 88
 const VIEWS = ['table', 'list', 'board', 'time']
 
-const LANES = [
-  { id: 0, key: 'input', kinds: ['user', 'context'] },
-  { id: 1, key: 'model', kinds: ['thinking', 'message'] },
-  { id: 2, key: 'tools', kinds: ['tool', 'subagent', 'approval', 'error'] }
+const LANE_KEYS = ['input', 'model', 'tools']
+const POOL = ['user', 'context', 'thinking', 'message', 'tool', 'subagent', 'approval', 'error', 'todo', 'goal', 'background', 'compact']
+const DEFAULT_LANES = [
+  ['user', 'context'],
+  ['thinking', 'message'],
+  ['tool', 'subagent', 'approval', 'error']
 ]
 
 const store = { api: null }
@@ -45,7 +47,8 @@ const $viewKey = atom('')
 const $selected = atom(null)
 
 const $mode = atom('table')
-const $diy = atom(null)
+const $layouts = atom({})
+const $edit = atom(null)
 
 const DEFAULT = {
   user: '#4b5cc4',
@@ -55,23 +58,31 @@ const DEFAULT = {
   tool: '#ff8936',
   subagent: '#30dff3',
   approval: '#d9b611',
-  error: '#c3272b'
+  error: '#c3272b',
+  todo: '#38bdf8',
+  goal: '#c084fc',
+  background: '#94a3b8',
+  compact: '#14b8a6'
 }
 
 const KIND = {
-  user: { lane: 0 },
-  context: { lane: 0 },
-  thinking: { lane: 1 },
-  message: { lane: 1 },
-  tool: { lane: 2 },
-  subagent: { lane: 2 },
-  approval: { lane: 2 },
-  error: { lane: 2 }
+  user: 1,
+  context: 1,
+  thinking: 1,
+  message: 1,
+  tool: 1,
+  subagent: 1,
+  approval: 1,
+  error: 1,
+  todo: 1,
+  goal: 1,
+  background: 1,
+  compact: 1
 }
 
 const KIND_ALIAS = {
   system: 'context',
-  compacted: 'context',
+  compacted: 'compact',
   subtool: 'tool',
   result: 'tool'
 }
@@ -103,7 +114,11 @@ const LOCALES = {
       tool: 'TOOL',
       subagent: 'TASK',
       approval: 'WAIT',
-      error: 'ERR'
+      error: 'ERR',
+      todo: 'TODO',
+      goal: 'GOAL',
+      background: 'BG',
+      compact: 'PACK'
     },
     legend: {
       user: 'Prompt',
@@ -113,8 +128,13 @@ const LOCALES = {
       tool: 'Tool',
       subagent: 'Subtask',
       approval: 'Confirm',
-      error: 'Error'
+      error: 'Error',
+      todo: 'Todo',
+      goal: 'Goal',
+      background: 'Background',
+      compact: 'Compact'
     },
+    edit: { add: 'Add', done: 'Done' },
     evt: {
       round: (n) => `Turn ${n}`,
       thinking: 'Thinking',
@@ -158,7 +178,11 @@ const LOCALES = {
       tool: '工具',
       subagent: '子任务',
       approval: '待确认',
-      error: '出错'
+      error: '出错',
+      todo: '任务',
+      goal: '目标',
+      background: '后台',
+      compact: '压缩'
     },
     legend: {
       user: '提问',
@@ -168,8 +192,13 @@ const LOCALES = {
       tool: '工具',
       subagent: '子任务',
       approval: '待确认',
-      error: '出错'
+      error: '出错',
+      todo: '任务',
+      goal: '目标',
+      background: '后台',
+      compact: '压缩'
     },
+    edit: { add: '添加', done: '完成' },
     evt: {
       round: (n) => `第 ${n} 轮`,
       thinking: '思考',
@@ -213,7 +242,11 @@ const LOCALES = {
       tool: '工具',
       subagent: '子任務',
       approval: '待確認',
-      error: '出錯'
+      error: '出錯',
+      todo: '任務',
+      goal: '目標',
+      background: '後台',
+      compact: '壓縮'
     },
     legend: {
       user: '提問',
@@ -223,8 +256,13 @@ const LOCALES = {
       tool: '工具',
       subagent: '子任務',
       approval: '待確認',
-      error: '出錯'
+      error: '出錯',
+      todo: '任務',
+      goal: '目標',
+      background: '後台',
+      compact: '壓縮'
     },
+    edit: { add: '新增', done: '完成' },
     evt: {
       round: (n) => `第 ${n} 輪`,
       thinking: '思考',
@@ -268,7 +306,11 @@ const LOCALES = {
       tool: 'ツール',
       subagent: '子任務',
       approval: '確認',
-      error: 'エラー'
+      error: 'エラー',
+      todo: 'ToDo',
+      goal: '目標',
+      background: '裏',
+      compact: '圧縮'
     },
     legend: {
       user: '質問',
@@ -278,8 +320,13 @@ const LOCALES = {
       tool: 'ツール',
       subagent: '子任務',
       approval: '確認',
-      error: 'エラー'
+      error: 'エラー',
+      todo: 'ToDo',
+      goal: '目標',
+      background: 'バックグラウンド',
+      compact: '圧縮'
     },
+    edit: { add: '追加', done: '完了' },
     evt: {
       round: (n) => `ターン ${n}`,
       thinking: '思考中',
@@ -323,7 +370,11 @@ const LOCALES = {
       tool: 'أداة',
       subagent: 'مهمة',
       approval: 'انتظار',
-      error: 'خطأ'
+      error: 'خطأ',
+      todo: 'مهام',
+      goal: 'هدف',
+      background: 'خلفية',
+      compact: 'ضغط'
     },
     legend: {
       user: 'سؤال',
@@ -333,8 +384,13 @@ const LOCALES = {
       tool: 'أداة',
       subagent: 'مهمة فرعية',
       approval: 'انتظار',
-      error: 'خطأ'
+      error: 'خطأ',
+      todo: 'مهام',
+      goal: 'هدف',
+      background: 'خلفية',
+      compact: 'ضغط'
     },
+    edit: { add: 'أضف', done: 'تم' },
     evt: {
       round: (n) => `الدورة ${n}`,
       thinking: 'يفكر',
@@ -358,12 +414,38 @@ function visualKind(name) {
   return KIND_ALIAS[name] || (KIND[name] ? name : 'context')
 }
 
+function emptyLayout() {
+  return { lanes: DEFAULT_LANES.map((row) => row.slice()), diy: null }
+}
+
+function layoutOf(key) {
+  return $layouts.get()[key || liveKey()] || emptyLayout()
+}
+
+function writeLayout(key, next) {
+  $layouts.set({ ...$layouts.get(), [key]: next })
+  persist()
+}
+
+function liveLanes() {
+  return layoutOf($viewKey.get()).lanes
+}
+
+function laneOf(kind) {
+  const k = visualKind(kind)
+  const lanes = liveLanes()
+  for (let i = 0; i < 3; i += 1) {
+    if (lanes[i] && lanes[i].includes(k)) return i
+  }
+  return -1
+}
+
 function kindMeta(name) {
-  return KIND[visualKind(name)]
+  return { lane: laneOf(name) }
 }
 
 function liveColors() {
-  return { ...DEFAULT, ...($diy.get() || {}) }
+  return { ...DEFAULT, ...(layoutOf($viewKey.get()).diy || {}) }
 }
 
 function colorOf(kind, error) {
@@ -502,8 +584,8 @@ function persist() {
       store.api.set('traj-v3', {
         buckets: $buckets.get(),
         aliases: $aliases.get(),
-        mode: $mode.get(),
-        diy: $diy.get()
+        layouts: $layouts.get(),
+        mode: $mode.get()
       })
   } catch {
     /* ignore */
@@ -517,8 +599,24 @@ function setMode(id) {
 }
 
 function setDiyColor(kind, hex) {
-  $diy.set({ ...liveColors(), [kind]: hex })
-  persist()
+  const key = $viewKey.get()
+  const cur = layoutOf(key)
+  writeLayout(key, { ...cur, diy: { ...(cur.diy || {}), [kind]: hex } })
+}
+
+function dropKind(lane, kind) {
+  const key = $viewKey.get()
+  const cur = layoutOf(key)
+  const lanes = cur.lanes.map((row, i) => (i === lane ? row.filter((k) => k !== kind) : row.slice()))
+  writeLayout(key, { ...cur, lanes })
+}
+
+function addKind(lane, kind) {
+  const key = $viewKey.get()
+  const cur = layoutOf(key)
+  const lanes = cur.lanes.map((row) => row.filter((k) => k !== kind))
+  if (!lanes[lane].includes(kind)) lanes[lane] = [...lanes[lane], kind]
+  writeLayout(key, { ...cur, lanes })
 }
 
 function writeBucket(key, next) {
@@ -596,12 +694,13 @@ function useNow(active) {
 function useViewEvents() {
   useValue($buckets)
   useValue($aliases)
+  useValue($layouts)
   const key = useValue($viewKey)
-  return mergedEvents(key)
+  return mergedEvents(key).filter((ev) => laneOf(ev.kind) >= 0)
 }
 
 function Timeline({ t }) {
-  useValue($diy)
+  useValue($layouts)
   const events = useViewEvents()
   const selected = useValue($selected)
   const scroller = useRef(null)
@@ -631,24 +730,33 @@ function Timeline({ t }) {
             fontSize: 11,
             fontWeight: 600
           },
-          children: LANES.map((lane) =>
+          children: liveLanes().map((kinds, id) =>
             jsx(
-              'div',
+              'button',
               {
+                type: 'button',
+                onClick: () => $edit.set($edit.get() === id ? null : id),
                 style: {
                   position: 'absolute',
                   left: 4,
                   right: 4,
-                  top: 8 + lane.id * LANE_H,
+                  top: 8 + id * LANE_H,
                   height: SPAN_H + 6,
                   display: 'flex',
                   alignItems: 'center',
                   whiteSpace: 'nowrap',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  border: 'none',
+                  padding: 0,
+                  background: 'transparent',
+                  color: 'inherit',
+                  font: 'inherit',
+                  fontWeight: 600,
+                  cursor: 'pointer'
                 },
-                children: tx(t, `lane.${lane.key}`, lane.key)
+                children: tx(t, `lane.${LANE_KEYS[id]}`, LANE_KEYS[id])
               },
-              lane.key
+              LANE_KEYS[id]
             )
           )
         }),
@@ -673,7 +781,7 @@ function Timeline({ t }) {
           children: jsx('div', {
             style: { position: 'relative', width, height: TIMELINE_H, minWidth: '100%' },
             children: [
-              ...LANES.map((lane) =>
+              ...liveLanes().map((kinds, id) =>
                 jsx(
                   'div',
                   {
@@ -681,13 +789,13 @@ function Timeline({ t }) {
                       position: 'absolute',
                       left: 0,
                       right: 0,
-                      top: 8 + lane.id * LANE_H + SPAN_H + 4,
+                      top: 8 + id * LANE_H + SPAN_H + 4,
                       height: 1,
                       background: 'var(--ui-stroke-secondary)',
                       opacity: 0.45
                     }
                   },
-                  `rule-${lane.key}`
+                  `rule-${LANE_KEYS[id]}`
                 )
               ),
               events.length === 0
@@ -737,7 +845,8 @@ function Timeline({ t }) {
 }
 
 function Legend({ t }) {
-  useValue($diy)
+  useValue($layouts)
+  const lanes = liveLanes()
   return jsx('div', {
     style: {
       display: 'grid',
@@ -748,7 +857,7 @@ function Legend({ t }) {
       fontSize: 11,
       color: 'var(--ui-text-tertiary)'
     },
-    children: LANES.map((lane) =>
+    children: lanes.map((kinds, id) =>
       jsxs(
         'div',
         {
@@ -758,14 +867,25 @@ function Legend({ t }) {
             gap: 5,
             minWidth: 0,
             paddingRight: 6,
-            borderRight: lane.id < 2 ? '1px solid var(--ui-stroke-secondary)' : 'none'
+            borderRight: id < 2 ? '1px solid var(--ui-stroke-secondary)' : 'none'
           },
           children: [
-            jsx('div', {
-              style: { fontWeight: 600, color: 'var(--ui-text-secondary)', marginBottom: 1 },
-              children: tx(t, `lane.${lane.key}`, lane.key)
+            jsx('button', {
+              type: 'button',
+              onClick: () => $edit.set($edit.get() === id ? null : id),
+              style: {
+                fontWeight: 600,
+                color: 'var(--ui-text-secondary)',
+                marginBottom: 1,
+                border: 'none',
+                background: 'transparent',
+                padding: 0,
+                textAlign: 'left',
+                cursor: 'pointer'
+              },
+              children: tx(t, `lane.${LANE_KEYS[id]}`, LANE_KEYS[id])
             }),
-            ...lane.kinds.map((kind) =>
+            ...kinds.map((kind) =>
               jsxs(
                 'label',
                 {
@@ -792,15 +912,100 @@ function Legend({ t }) {
             )
           ]
         },
-        lane.key
+        LANE_KEYS[id]
       )
     )
   })
 }
 
+function LaneEditor({ t }) {
+  const edit = useValue($edit)
+  useValue($layouts)
+  if (edit == null) return null
+  const used = new Set(liveLanes().flat())
+  const mine = liveLanes()[edit] || []
+  const extra = POOL.filter((k) => !used.has(k))
+  return jsxs('div', {
+    style: {
+      padding: '8px 10px',
+      borderBottom: '1px solid var(--ui-stroke-secondary)',
+      fontSize: 11
+    },
+    children: [
+      jsxs('div', {
+        style: { display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontWeight: 600 },
+        children: [
+          jsx('span', { children: tx(t, `lane.${LANE_KEYS[edit]}`, LANE_KEYS[edit]) }),
+          jsx('button', {
+            type: 'button',
+            onClick: () => $edit.set(null),
+            style: { border: 'none', background: 'transparent', color: 'var(--ui-text-tertiary)', cursor: 'pointer' },
+            children: tx(t, 'edit.done', 'Done')
+          })
+        ]
+      }),
+      jsx('div', {
+        style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: extra.length ? 8 : 0 },
+        children: mine.map((kind) =>
+          jsxs(
+            'span',
+            {
+              style: {
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                border: '1px solid var(--ui-stroke-secondary)',
+                borderRadius: 6,
+                padding: '2px 6px'
+              },
+              children: [
+                tx(t, `legend.${kind}`, kind),
+                jsx('button', {
+                  type: 'button',
+                  onClick: () => dropKind(edit, kind),
+                  style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--ui-text-quaternary)' },
+                  children: '×'
+                })
+              ]
+            },
+            kind
+          )
+        )
+      }),
+      extra.length
+        ? jsxs('div', {
+            style: { display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
+            children: [
+              jsx('span', { style: { color: 'var(--ui-text-quaternary)' }, children: tx(t, 'edit.add', 'Add') }),
+              ...extra.map((kind) =>
+                jsx(
+                  'button',
+                  {
+                    type: 'button',
+                    onClick: () => addKind(edit, kind),
+                    style: {
+                      border: '1px solid var(--ui-stroke-secondary)',
+                      borderRadius: 6,
+                      padding: '2px 6px',
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      color: 'var(--ui-text-secondary)'
+                    },
+                    children: tx(t, `legend.${kind}`, kind)
+                  },
+                  kind
+                )
+              )
+            ]
+          })
+        : null
+    ]
+  })
+}
+
 function EventRow({ ev, now, t }) {
   const selected = useValue($selected)
-  useValue($diy)
+  useValue($layouts)
   const vk = visualKind(ev.kind)
   const dur = ev.running ? formatElapsed(now - ev.at) : ev.ms != null ? formatElapsed(ev.ms) : ''
   const c = colorOf(ev.kind, ev.error)
@@ -851,8 +1056,8 @@ function clock(ts) {
 function BoardView({ events, now, t }) {
   return jsx('div', {
     style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, padding: 8, alignItems: 'start' },
-    children: LANES.map((lane) => {
-      const rows = [...events].reverse().filter((ev) => kindMeta(ev.kind).lane === lane.id)
+    children: liveLanes().map((kinds, id) => {
+      const rows = [...events].reverse().filter((ev) => kindMeta(ev.kind).lane === id)
       return jsxs(
         'div',
         {
@@ -862,19 +1067,19 @@ function BoardView({ events, now, t }) {
             flexDirection: 'column',
             gap: 6,
             paddingRight: 6,
-            borderRight: lane.id < 2 ? '1px solid var(--ui-stroke-secondary)' : 'none'
+            borderRight: id < 2 ? '1px solid var(--ui-stroke-secondary)' : 'none'
           },
           children: [
             jsx('div', {
               style: { fontSize: 11, fontWeight: 600, color: 'var(--ui-text-secondary)' },
-              children: tx(t, `lane.${lane.key}`, lane.key)
+              children: tx(t, `lane.${LANE_KEYS[id]}`, LANE_KEYS[id])
             }),
             rows.length
               ? rows.map((ev) => jsx(EventRow, { ev, now, t }, `${ev.at}-${ev.id}`))
               : jsx('div', { style: { fontSize: 11, color: 'var(--ui-text-quaternary)' }, children: '—' })
           ]
         },
-        lane.key
+        LANE_KEYS[id]
       )
     })
   })
@@ -934,7 +1139,7 @@ function TableView({ events, now, t }) {
             },
             children: [
               jsx('span', { style: { color: 'var(--ui-text-quaternary)' }, children: clock(ev.at) }),
-              jsx('span', { children: tx(t, `lane.${LANES[kindMeta(ev.kind).lane].key}`, '') }),
+              jsx('span', { children: tx(t, `lane.${LANE_KEYS[Math.max(0, kindMeta(ev.kind).lane)]}`, '') }),
               jsx('span', { style: { color: c, fontWeight: 600 }, children: tx(t, `kind.${vk}`, vk) }),
               jsx('span', { className: 'truncate', children: eventText(t, ev) }),
               jsx('span', { style: { color: 'var(--ui-text-quaternary)' }, children: ev.running ? `${dur}…` : dur })
@@ -1016,6 +1221,7 @@ function TrajectoryPane() {
     className: 'flex h-full min-h-0 flex-col',
     children: [
       jsx(Timeline, { t }),
+      jsx(LaneEditor, { t }),
       jsx(Legend, { t }),
       jsxs('div', {
         className: 'flex items-center justify-between gap-2 px-2.5 py-1.5',
@@ -1120,7 +1326,7 @@ export default {
         $buckets.set(saved.buckets)
         if (saved.aliases) $aliases.set(saved.aliases)
         if (VIEWS.includes(saved.mode)) $mode.set(saved.mode)
-        if (saved.diy && typeof saved.diy === 'object') $diy.set(saved.diy)
+        if (saved.layouts && typeof saved.layouts === 'object') $layouts.set(saved.layouts)
       } else {
         $buckets.set(saved)
       }
@@ -1135,6 +1341,7 @@ export default {
       if (next !== $viewKey.get()) {
         $viewKey.set(next)
         $selected.set(null)
+        $edit.set(null)
       }
     }
     const offProfile = listenSafe(host.state.profile, syncView)
@@ -1187,7 +1394,8 @@ export default {
       if (type === 'tool.start' || type === 'tool.generating') {
         const tkey = `${key}::${payload.tool_id || payload.id || name || Date.now()}`
         if (!tools.has(tkey)) {
-          const kind = name === 'delegate_task' || payload.parent ? 'subtool' : 'tool'
+          const kind =
+            name === 'todo' ? 'todo' : name === 'delegate_task' || payload.parent ? 'subtool' : 'tool'
           const textKey = name === 'todo' ? 'evt.todo' : 'evt.tool'
           tools.set(tkey, {
             id: pushEvent(key, kind, {
@@ -1252,9 +1460,14 @@ export default {
         pushEvent(key, 'approval', { textKey: type === 'clarify.request' ? 'evt.clarify' : 'evt.approve' })
         return
       }
+      if (type === 'background.complete') {
+        pushEvent(key, 'background', { textKey: 'evt.tool', args: [name || 'bg'] })
+        return
+      }
       if (type === 'status.update') {
         const text = String(payload.status || payload.message || payload.phase || '')
         if (/compact/i.test(text)) pushEvent(key, 'compacted', { textKey: 'evt.compact' })
+        else if (/goal/i.test(text)) pushEvent(key, 'goal', { textKey: 'evt.todo' })
         return
       }
       if (type === 'error') {
