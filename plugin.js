@@ -1015,8 +1015,8 @@ function TrajectoryPane() {
   return jsxs('div', {
     className: 'flex h-full min-h-0 flex-col',
     children: [
-      jsx(Legend, { t }),
       jsx(Timeline, { t }),
+      jsx(Legend, { t }),
       jsxs('div', {
         className: 'flex items-center justify-between gap-2 px-2.5 py-1.5',
         style: { borderBottom: '1px solid var(--ui-stroke-secondary)' },
