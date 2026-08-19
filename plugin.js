@@ -91,7 +91,6 @@ const LOCALES = {
   en: {
     title: 'Trajectory',
     chip: 'Trajectory',
-    onlyThis: 'This chat · drag the bar',
     emptyTitle: 'No steps yet',
     emptyBody: 'Send a message. Colors stay after the turn. Switching chat or bot keeps histories apart.',
     idle: 'Idle',
@@ -99,7 +98,6 @@ const LOCALES = {
     running: (tags) => `Live ${tags}`,
     clear: 'Clear this chat',
     view: { board: 'Board', list: 'List', table: 'Table', time: 'Time' },
-    theme: { china: 'China', qinghua: 'Qinghua', zhumo: 'Cinnabar', bright: 'Bright', diy: 'Custom', open: 'Colors' },
     when: { today: 'Today' },
     col: { time: 'Time', lane: 'Lane', kind: 'Kind', text: 'What', dur: 'Dur' },
     help: 'Help: Trajectory',
@@ -155,7 +153,6 @@ const LOCALES = {
   zh: {
     title: '轨迹',
     chip: '轨迹',
-    onlyThis: '只显示这场 · 轴可横滑',
     emptyTitle: '这场还没有轨迹',
     emptyBody: '发一条消息就会按颜色留下每一步。换对话或换 bot 不会混。',
     idle: '空闲',
@@ -163,7 +160,6 @@ const LOCALES = {
     running: (tags) => `进行中 ${tags}`,
     clear: '清空本场',
     view: { board: '看板', list: '列表', table: '表格', time: '时间' },
-    theme: { china: '中国色', qinghua: '青花', zhumo: '朱墨', bright: '现行', diy: '自己选', open: '配色' },
     when: { today: '今天' },
     col: { time: '时间', lane: '列', kind: '种类', text: '内容', dur: '耗时' },
     help: '轨迹说明',
@@ -219,7 +215,6 @@ const LOCALES = {
   'zh-hant': {
     title: '軌跡',
     chip: '軌跡',
-    onlyThis: '只顯示這場 · 軸可橫滑',
     emptyTitle: '這場還沒有軌跡',
     emptyBody: '送出訊息後依顏色留下每一步。切對話或切 bot 不會混在一起。',
     idle: '閒置',
@@ -227,7 +222,6 @@ const LOCALES = {
     running: (tags) => `進行中 ${tags}`,
     clear: '清空本場',
     view: { board: '看板', list: '列表', table: '表格', time: '時間' },
-    theme: { china: '中國色', qinghua: '青花', zhumo: '朱墨', bright: '現行', diy: '自選', open: '配色' },
     when: { today: '今天' },
     col: { time: '時間', lane: '欄', kind: '種類', text: '內容', dur: '耗時' },
     help: '軌跡說明',
@@ -283,7 +277,6 @@ const LOCALES = {
   ja: {
     title: '軌跡',
     chip: '軌跡',
-    onlyThis: 'この会話のみ · バーは横スクロール',
     emptyTitle: 'まだ軌跡がありません',
     emptyBody: '送信すると色で手順が残ります。会話や bot を切り替えても混ざりません。',
     idle: '待機',
@@ -291,7 +284,6 @@ const LOCALES = {
     running: (tags) => `実行中 ${tags}`,
     clear: 'この会話を消去',
     view: { board: 'ボード', list: 'リスト', table: '表', time: '時間' },
-    theme: { china: '中国色', qinghua: '青花', zhumo: '朱墨', bright: '現行', diy: '自分で', open: '配色' },
     when: { today: '今日' },
     col: { time: '時刻', lane: '列', kind: '種類', text: '内容', dur: '時間' },
     help: '軌跡の説明',
@@ -347,7 +339,6 @@ const LOCALES = {
   ar: {
     title: 'المسار',
     chip: 'المسار',
-    onlyThis: 'هذه المحادثة فقط · حرّك الشريط',
     emptyTitle: 'لا مسار بعد',
     emptyBody: 'أرسل رسالة. الألوان تعلّم كل خطوة. تبديل المحادثة أو البوت لا يخلط السجلات.',
     idle: 'خامل',
@@ -355,7 +346,6 @@ const LOCALES = {
     running: (tags) => `جارٍ ${tags}`,
     clear: 'مسح هذه المحادثة',
     view: { board: 'لوحة', list: 'قائمة', table: 'جدول', time: 'زمن' },
-    theme: { china: 'صيني', qinghua: 'خزف', zhumo: 'حبر', bright: 'واضح', diy: 'خاص', open: 'ألوان' },
     when: { today: 'اليوم' },
     col: { time: 'وقت', lane: 'مسار', kind: 'نوع', text: 'ماذا', dur: 'مدة' },
     help: 'شرح المسار',
@@ -456,6 +446,7 @@ function colorOf(kind, error) {
 
 function lockTo(id) {
   $selected.set(id)
+  if (id == null) return
   const run = () => {
     document.querySelectorAll(`[data-eid="${id}"]`).forEach((el) => {
       try {
@@ -817,7 +808,8 @@ function Timeline({ t }) {
                       {
                         type: 'button',
                         title: `${tx(t, `kind.${visualKind(ev.kind)}`, ev.kind)} ${eventText(t, ev)}`,
-                        onClick: () => $selected.set(ev.id),
+                        'data-eid': String(ev.id),
+                        onClick: () => lockTo(ev.id),
                         style: {
                           position: 'absolute',
                           top: 8 + meta.lane * LANE_H,
@@ -1011,7 +1003,8 @@ function EventRow({ ev, now, t }) {
   const c = colorOf(ev.kind, ev.error)
   return jsxs('button', {
     type: 'button',
-    onClick: () => $selected.set(ev.id === selected ? null : ev.id),
+    'data-eid': String(ev.id),
+    onClick: () => lockTo(ev.id === selected ? null : ev.id),
     className: 'w-full text-left',
     style: {
       display: 'flex',
@@ -1045,12 +1038,6 @@ function EventRow({ ev, now, t }) {
       })
     ]
   })
-}
-
-function clock(ts) {
-  const d = new Date(ts)
-  const p = (n) => String(n).padStart(2, '0')
-  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
 }
 
 function BoardView({ events, now, t }) {
@@ -1100,18 +1087,18 @@ function TableView({ events, now, t }) {
       jsxs('div', {
         style: {
           display: 'grid',
-          gridTemplateColumns: '64px 44px 56px minmax(0, 1fr) 44px',
+          gridTemplateColumns: '118px 40px 52px minmax(0, 1fr) 40px',
           gap: 6,
           fontSize: 10,
           color: 'var(--ui-text-quaternary)',
           padding: '0 4px 6px'
         },
         children: [
-          jsx('span', { children: '' }),
-          jsx('span', { children: '' }),
-          jsx('span', { children: '' }),
-          jsx('span', { children: '' }),
-          jsx('span', { children: '' })
+          jsx('span', { children: tx(t, 'col.time', '') }),
+          jsx('span', { children: tx(t, 'col.lane', '') }),
+          jsx('span', { children: tx(t, 'col.kind', '') }),
+          jsx('span', { children: tx(t, 'col.text', '') }),
+          jsx('span', { children: tx(t, 'col.dur', '') })
         ]
       }),
       ...rows.map((ev) => {
@@ -1122,10 +1109,11 @@ function TableView({ events, now, t }) {
           'button',
           {
             type: 'button',
-            onClick: () => $selected.set(ev.id),
+            'data-eid': String(ev.id),
+            onClick: () => lockTo(ev.id),
             style: {
               display: 'grid',
-              gridTemplateColumns: '64px 44px 56px minmax(0, 1fr) 44px',
+              gridTemplateColumns: '118px 40px 52px minmax(0, 1fr) 40px',
               gap: 6,
               width: '100%',
               textAlign: 'left',
@@ -1138,7 +1126,7 @@ function TableView({ events, now, t }) {
               fontSize: 11
             },
             children: [
-              jsx('span', { style: { color: 'var(--ui-text-quaternary)' }, children: clock(ev.at) }),
+              jsx('span', { style: { color: 'var(--ui-text-quaternary)' }, children: when(ev.at, now) }),
               jsx('span', { children: tx(t, `lane.${LANE_KEYS[Math.max(0, kindMeta(ev.kind).lane)]}`, '') }),
               jsx('span', { style: { color: c, fontWeight: 600 }, children: tx(t, `kind.${vk}`, vk) }),
               jsx('span', { className: 'truncate', children: eventText(t, ev) }),
@@ -1162,11 +1150,13 @@ function TimeView({ events, now, t }) {
       return jsxs(
         'div',
         {
-          style: { display: 'grid', gridTemplateColumns: '56px 14px minmax(0, 1fr)', gap: 8 },
+          'data-eid': String(ev.id),
+          onClick: () => lockTo(ev.id),
+          style: { display: 'grid', gridTemplateColumns: '72px 14px minmax(0, 1fr)', gap: 8, cursor: 'pointer' },
           children: [
             jsx('span', {
               style: { fontSize: 10, color: 'var(--ui-text-quaternary)', paddingTop: 2 },
-              children: clock(ev.at)
+              children: when(ev.at, now)
             }),
             jsxs('div', {
               style: { position: 'relative', display: 'flex', justifyContent: 'center' },
