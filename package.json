@@ -1,0 +1,11 @@
+{
+  "name": "hermes-trajectory",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Hermes Desktop trajectory pane",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test"
+  }
+}

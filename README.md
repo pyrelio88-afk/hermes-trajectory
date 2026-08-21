@@ -49,4 +49,12 @@ Events store keys, so switching the app language updates the pane.
 
 One ESM file. Imports only `@hermes/plugin-sdk`, `react`, `react/jsx-runtime`. No build, no JSX syntax.
 
+## Development
+
+```sh
+npm test
+```
+
+The test suite checks the single-file ESM contract and import allowlist. Hermes Desktop is still the source of truth for live event behavior.
+
 MIT.

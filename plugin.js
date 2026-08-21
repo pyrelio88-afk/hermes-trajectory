@@ -23,7 +23,7 @@ import { useEffect, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
 const ID = 'harness-progress'
-const VERSION = '0.0.1'
+const VERSION = '0.1.0'
 const MAX_EVENTS = 240
 const LANE_H = 24
 const SPAN_H = 11
@@ -532,18 +532,13 @@ function rememberAlias(runtime, stored) {
   persist()
 }
 
-function eventKey(event) {
-  const evSid = String(event.session_id || event.sessionId || '')
-  const stored = storedSid()
-  const runtime = runtimeSid()
-  const prof = profileName(event)
-  if (evSid && stored) rememberAlias(evSid, stored)
-  if (runtime && stored) rememberAlias(runtime, stored)
-  if (!evSid || evSid === stored || evSid === runtime) {
-    return scopeKey(prof, stored || runtime || 'draft')
-  }
-  const mapped = $aliases.get()[evSid]
-  return scopeKey(prof, mapped || evSid)
+function canonicalSid(event) {
+  const evSid = String((event && (event.session_id || event.sessionId)) || '')
+  return evSid || runtimeSid() || storedSid() || 'draft'
+}
+
+function canonicalKey(event) {
+  return scopeKey(profileName(event), canonicalSid(event))
 }
 
 function relatedKeys(canonical) {
@@ -584,6 +579,66 @@ function persist() {
   }
 }
 
+function normalizeBucket(bucket) {
+  if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket)) return emptyBucket()
+  const seq = Number.isFinite(bucket.seq) ? Math.max(0, Math.floor(bucket.seq)) : 0
+  const events = Array.isArray(bucket.events)
+    ? bucket.events
+        .filter((event) => event && typeof event === 'object')
+        .map((event, index) => ({
+          id: Number.isFinite(event.id) ? event.id : index + 1,
+          kind: visualKind(event.kind),
+          at: Number.isFinite(event.at) ? event.at : Date.now(),
+          running: Boolean(event.running),
+          error: Boolean(event.error),
+          ms: Number.isFinite(event.ms) ? event.ms : undefined,
+          textKey: typeof event.textKey === 'string' ? event.textKey : undefined,
+          label: typeof event.label === 'string' ? event.label : undefined,
+          args: Array.isArray(event.args) ? event.args.filter((arg) => arg != null).map(String) : undefined
+        }))
+        .slice(-MAX_EVENTS)
+    : []
+  return { seq: Math.max(seq, events.length), events }
+}
+
+function normalizeLayout(layout) {
+  if (!layout || typeof layout !== 'object' || Array.isArray(layout)) return emptyLayout()
+  const lanes = Array.isArray(layout.lanes) && layout.lanes.length === LANE_KEYS.length
+    ? layout.lanes.map((row, laneIndex) =>
+        Array.isArray(row)
+          ? [...new Set(row.filter((kind) => POOL.includes(kind)).map(visualKind))]
+          : DEFAULT_LANES[laneIndex].slice()
+      )
+    : DEFAULT_LANES.map((row) => row.slice())
+  const diy = layout.diy && typeof layout.diy === 'object' && !Array.isArray(layout.diy)
+    ? Object.fromEntries(
+        Object.entries(layout.diy).filter(([kind, color]) => POOL.includes(kind) && typeof color === 'string')
+      )
+    : null
+  return { lanes, diy: diy && Object.keys(diy).length ? diy : null }
+}
+
+function pruneStorage() {
+  const buckets = $buckets.get()
+  const aliases = $aliases.get()
+  const layouts = $layouts.get()
+  const nextBuckets = {}
+  for (const [key, bucket] of Object.entries(buckets)) {
+    if (key.includes('::')) nextBuckets[key] = normalizeBucket(bucket)
+  }
+  const nextLayouts = {}
+  for (const [key, layout] of Object.entries(layouts)) {
+    if (key.includes('::')) nextLayouts[key] = normalizeLayout(layout)
+  }
+  const nextAliases = {}
+  for (const [runtime, stored] of Object.entries(aliases)) {
+    if (runtime && stored && runtime !== stored) nextAliases[runtime] = String(stored)
+  }
+  $buckets.set(nextBuckets)
+  $aliases.set(nextAliases)
+  $layouts.set(nextLayouts)
+}
+
 function setMode(id) {
   if (!VIEWS.includes(id)) return
   $mode.set(id)
@@ -593,12 +648,14 @@ function setMode(id) {
 function setDiyColor(kind, hex) {
   const key = $viewKey.get()
   const cur = layoutOf(key)
+  if (!POOL.includes(kind) || typeof hex !== 'string') return
   writeLayout(key, { ...cur, diy: { ...(cur.diy || {}), [kind]: hex } })
 }
 
 function dropKind(lane, kind) {
   const key = $viewKey.get()
   const cur = layoutOf(key)
+  if (!Number.isInteger(lane) || lane < 0 || lane >= LANE_KEYS.length || !POOL.includes(kind)) return
   const lanes = cur.lanes.map((row, i) => (i === lane ? row.filter((k) => k !== kind) : row.slice()))
   writeLayout(key, { ...cur, lanes })
 }
@@ -606,27 +663,33 @@ function dropKind(lane, kind) {
 function addKind(lane, kind) {
   const key = $viewKey.get()
   const cur = layoutOf(key)
+  if (!Number.isInteger(lane) || lane < 0 || lane >= LANE_KEYS.length || !POOL.includes(kind)) return
   const lanes = cur.lanes.map((row) => row.filter((k) => k !== kind))
   if (!lanes[lane].includes(kind)) lanes[lane] = [...lanes[lane], kind]
   writeLayout(key, { ...cur, lanes })
 }
 
 function writeBucket(key, next) {
-  $buckets.set({ ...$buckets.get(), [key]: next })
+  $buckets.set({ ...$buckets.get(), [key]: normalizeBucket(next) })
   persist()
 }
 
 function pushEvent(key, kind, extra) {
+  const canonicalKind = visualKind(kind)
+  if (!POOL.includes(canonicalKind)) return null
   const b = bucketOf(key)
   const seq = b.seq + 1
+  const id = seq
   const item = {
-    id: seq,
-    kind,
+    id,
+    kind: canonicalKind,
     at: Date.now(),
     running: false,
     error: false,
     ...extra
   }
+  item.id = id
+  item.kind = visualKind(item.kind)
   const events =
     b.events.length >= MAX_EVENTS ? [...b.events.slice(b.events.length - MAX_EVENTS + 1), item] : [...b.events, item]
   writeBucket(key, { seq, events })
@@ -635,16 +698,21 @@ function pushEvent(key, kind, extra) {
 
 function patchEvent(key, id, patch) {
   const b = bucketOf(key)
-  writeBucket(key, {
-    seq: b.seq,
-    events: b.events.map((e) => (e.id === id ? { ...e, ...patch } : e))
+  let changed = false
+  const events = b.events.map((event) => {
+    if (event.id !== id) return event
+    changed = true
+    return normalizeBucket({ events: [{ ...event, ...patch }] }).events[0]
   })
+  if (!changed) return
+  writeBucket(key, { seq: b.seq, events })
 }
 
 function lastOf(key, kind, runningOnly) {
+  const canonicalKind = visualKind(kind)
   const list = bucketOf(key).events
   for (let i = list.length - 1; i >= 0; i -= 1) {
-    if (list[i].kind !== kind) continue
+    if (list[i].kind !== canonicalKind) continue
     if (runningOnly && !list[i].running) continue
     return list[i]
   }
@@ -654,9 +722,9 @@ function lastOf(key, kind, runningOnly) {
 function mergedEvents(canonical) {
   const seen = new Set()
   const out = []
-  for (const key of relatedKeys(canonical)) {
+  for (const key of new Set([canonical, ...relatedKeys(canonical)])) {
     for (const ev of bucketOf(key).events) {
-      const stamp = `${ev.at}:${ev.kind}:${ev.textKey || ev.label || ''}:${ev.id}`
+      const stamp = `${key}:${ev.at}:${ev.kind}:${ev.textKey || ev.label || ''}:${ev.id}`
       if (seen.has(stamp)) continue
       seen.add(stamp)
       out.push(ev)
@@ -671,6 +739,10 @@ function formatElapsed(ms) {
   const s = Math.floor(ms / 1000)
   if (s < 60) return `${s}s`
   return `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s`
+}
+
+function eventDuration(event, now) {
+  return event.running ? formatElapsed(now - event.at) : event.ms != null ? formatElapsed(event.ms) : ''
 }
 
 function useNow(active) {
@@ -1000,7 +1072,7 @@ function EventRow({ ev, now, t }) {
   const selected = useValue($selected)
   useValue($layouts)
   const vk = visualKind(ev.kind)
-  const dur = ev.running ? formatElapsed(now - ev.at) : ev.ms != null ? formatElapsed(ev.ms) : ''
+  const dur = eventDuration(ev, now)
   const c = colorOf(ev.kind, ev.error)
   return jsxs('button', {
     type: 'button',
@@ -1105,7 +1177,7 @@ function TableView({ events, now, t }) {
       ...rows.map((ev) => {
         const vk = visualKind(ev.kind)
         const c = colorOf(ev.kind, ev.error)
-        const dur = ev.running ? formatElapsed(now - ev.at) : ev.ms != null ? formatElapsed(ev.ms) : ''
+        const dur = eventDuration(ev, now)
         return jsxs(
           'button',
           {
@@ -1147,7 +1219,7 @@ function TimeView({ events, now, t }) {
     children: [...events].reverse().map((ev, i, arr) => {
       const vk = visualKind(ev.kind)
       const c = colorOf(ev.kind, ev.error)
-      const dur = ev.running ? formatElapsed(now - ev.at) : ev.ms != null ? formatElapsed(ev.ms) : ''
+      const dur = eventDuration(ev, now)
       return jsxs(
         'div',
         {
@@ -1284,6 +1356,7 @@ function StatusChip() {
 function listenSafe(target, fn) {
   try {
     if (target && typeof target.listen === 'function') return target.listen(fn)
+    if (target && typeof target.subscribe === 'function') return target.subscribe(fn)
   } catch {
     /* older desktop */
   }
@@ -1318,11 +1391,15 @@ export default {
         $buckets.set(saved.buckets)
         if (saved.aliases) $aliases.set(saved.aliases)
         if (VIEWS.includes(saved.mode)) $mode.set(saved.mode)
-        if (saved.layouts && typeof saved.layouts === 'object') $layouts.set(saved.layouts)
+        if (saved.layouts && typeof saved.layouts === 'object') {
+          $layouts.set(Object.fromEntries(Object.entries(saved.layouts).map(([key, layout]) => [key, normalizeLayout(layout)])))
+        }
       } else {
         $buckets.set(saved)
       }
     }
+    pruneStorage()
+    persist()
     $viewKey.set(liveKey())
 
     const syncView = () => {
@@ -1346,7 +1423,7 @@ export default {
     const agents = new Map()
 
     const offBusy = listenSafe(host.state.busy, (busy) => {
-      const key = liveKey()
+      const key = canonicalKey(null)
       if (busy) {
         if (!thinking.has(key) && !lastOf(key, 'thinking', true)) {
           thinking.set(key, { id: pushEvent(key, 'thinking', { textKey: 'evt.thinking', running: true }), key, at: Date.now() })
@@ -1359,7 +1436,7 @@ export default {
 
     const off = host.onEvent('*', (event) => {
       if (!event || !event.type) return
-      const key = eventKey(event)
+      const key = canonicalKey(event)
       const type = event.type
       const payload = event.payload || {}
       const name = String(payload.name || payload.tool || payload.tool_name || payload.goal || '').trim()

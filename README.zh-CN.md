@@ -49,4 +49,12 @@ Hermes Desktop 右侧「轨迹」面板。一场对话分成三道：**提问 / 
 
 单文件 ESM。只能 import `@hermes/plugin-sdk` / `react` / `react/jsx-runtime`。无构建、无 JSX 语法。
 
+## 开发
+
+```sh
+npm test
+```
+
+测试会检查单文件 ESM 和 import 白名单。真实事件行为仍以 Hermes Desktop 为准。
+
 MIT。
