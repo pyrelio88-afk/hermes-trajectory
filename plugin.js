@@ -23,7 +23,7 @@ import { useEffect, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
 const ID = 'harness-progress'
-const VERSION = '0.1.0'
+const VERSION = '0.0.2'
 const MAX_EVENTS = 240
 const LANE_H = 24
 const SPAN_H = 11
